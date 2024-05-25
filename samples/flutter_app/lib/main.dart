@@ -12,16 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:logger/logger.dart';
 
 /// The API key to use when accessing the Gemini API.
 ///
 /// To learn how to generate and specify this key,
 /// check out the README file of this sample.
 const String _apiKey = String.fromEnvironment('API_KEY');
+
+var logger = Logger(
+  printer: PrettyPrinter(),
+);
+
+var loggerNoStack = Logger(
+  printer: PrettyPrinter(methodCount: 0),
+);
 
 void main() {
   runApp(const GenerativeAISample());
@@ -266,17 +277,35 @@ class _ChatWidgetState extends State<ChatWidget> {
     }
   }
 
-  Future<void> _sendChatMessage(String message) async {
+  Future<void> _sendChatMessageFromUser(String message) async {
     setState(() {
       _loading = true;
     });
 
     try {
       _generatedContent.add((image: null, text: message, fromUser: true));
+      setState(() {});
+    } catch (e) {
+      _showError(e.toString());
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _sendChatMessage(String message) async {
+    setState(() {
+      _loading = true;
+    });
+
+    try {
+      _sendChatMessageFromUser(message);
+      // _generatedContent.add((image: null, text: message, fromUser: true));
       final response = await _chat.sendMessage(
         Content.text(message),
       );
       final text = response.text;
+      logger.d(response.text);
       _generatedContent.add((image: null, text: text, fromUser: false));
 
       if (text == null) {
@@ -358,10 +387,68 @@ class MessageWidget extends StatelessWidget {
                 ),
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Column(children: [
-                  if (text case final text?) MarkdownBody(data: text),
+                  if (text case final text?)
+                    isFromUser
+                        ? MarkdownBody(data: text)
+                        : TypingMarkdown(markdownText: text),
                   if (image case final image?) image,
                 ]))),
       ],
+    );
+  }
+}
+
+class TypingMarkdown extends StatefulWidget {
+  final String markdownText;
+
+  const TypingMarkdown({super.key, required this.markdownText});
+
+  @override
+  _TypingMarkdownState createState() => _TypingMarkdownState();
+}
+
+class _TypingMarkdownState extends State<TypingMarkdown>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<int> _textAnimation;
+  String _displayedText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(
+          milliseconds:
+              10 * widget.markdownText.length), // Adjust duration as needed
+    );
+    _textAnimation =
+        IntTween(begin: 0, end: widget.markdownText.length).animate(_controller)
+          ..addListener(() {
+            setState(() {
+              _displayedText =
+                  widget.markdownText.substring(0, _textAnimation.value);
+            });
+          });
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          _displayedText,
+          style: const TextStyle(fontSize: 16.0),
+        ),
+      ),
     );
   }
 }

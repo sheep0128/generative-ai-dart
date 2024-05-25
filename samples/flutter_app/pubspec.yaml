@@ -14,6 +14,7 @@ dependencies:
   # Note: best practice here is to use a caret version constraint. We use `any`
   # here just for the purpose of the sample.
   google_generative_ai: any
+  logger: ^2.3.0
 
 dev_dependencies:
   flutter_test:
