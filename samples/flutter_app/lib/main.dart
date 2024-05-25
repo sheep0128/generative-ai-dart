@@ -161,6 +161,7 @@ class _ChatWidgetState extends State<ChatWidget> {
                         text: content.text,
                         image: content.image,
                         isFromUser: content.fromUser,
+                        scrollController: _scrollController,
                       );
                     },
                     itemCount: _generatedContent.length,
@@ -284,7 +285,10 @@ class _ChatWidgetState extends State<ChatWidget> {
 
     try {
       _generatedContent.add((image: null, text: message, fromUser: true));
-      setState(() {});
+      setState(() {
+        _scrollDown();
+        _textController.clear();
+      });
     } catch (e) {
       _showError(e.toString());
       setState(() {
@@ -355,16 +359,17 @@ class _ChatWidgetState extends State<ChatWidget> {
 }
 
 class MessageWidget extends StatelessWidget {
-  const MessageWidget({
-    super.key,
-    this.image,
-    this.text,
-    required this.isFromUser,
-  });
+  const MessageWidget(
+      {super.key,
+      this.image,
+      this.text,
+      required this.isFromUser,
+      required this.scrollController});
 
   final Image? image;
   final String? text;
   final bool isFromUser;
+  final ScrollController scrollController; // 수정: _scrollController 추가
 
   @override
   Widget build(BuildContext context) {
@@ -390,7 +395,10 @@ class MessageWidget extends StatelessWidget {
                   if (text case final text?)
                     isFromUser
                         ? MarkdownBody(data: text)
-                        : TypingMarkdown(markdownText: text),
+                        : TypingMarkdown(
+                            markdownText: text,
+                            scrollController: scrollController,
+                          ),
                   if (image case final image?) image,
                 ]))),
       ],
@@ -400,8 +408,10 @@ class MessageWidget extends StatelessWidget {
 
 class TypingMarkdown extends StatefulWidget {
   final String markdownText;
+  final ScrollController scrollController; // 수정: _scrollController 추가
 
-  const TypingMarkdown({super.key, required this.markdownText});
+  const TypingMarkdown(
+      {super.key, required this.markdownText, required this.scrollController});
 
   @override
   _TypingMarkdownState createState() => _TypingMarkdownState();
@@ -418,9 +428,7 @@ class _TypingMarkdownState extends State<TypingMarkdown>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: Duration(
-          milliseconds:
-              10 * widget.markdownText.length), // Adjust duration as needed
+      duration: Duration(milliseconds: 10 * widget.markdownText.length),
     );
     _textAnimation =
         IntTween(begin: 0, end: widget.markdownText.length).animate(_controller)
@@ -428,6 +436,7 @@ class _TypingMarkdownState extends State<TypingMarkdown>
             setState(() {
               _displayedText =
                   widget.markdownText.substring(0, _textAnimation.value);
+              _scrollDown();
             });
           });
     _controller.forward();
@@ -449,6 +458,14 @@ class _TypingMarkdownState extends State<TypingMarkdown>
           style: const TextStyle(fontSize: 16.0),
         ),
       ),
+    );
+  }
+
+  void _scrollDown() {
+    widget.scrollController.animateTo(
+      widget.scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 750),
+      curve: Curves.easeOutCirc,
     );
   }
 }
